@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SCP Foundation — Loading Screen</title>
+<style>
+  :root {
+    --bg: #050505;
+    --surface: rgba(255, 255, 255, 0.025);
+    --surface-2: rgba(255, 255, 255, 0.045);
+    --border: rgba(255, 255, 255, 0.09);
+    --border-soft: rgba(255, 255, 255, 0.05);
+    --text: #f2f0eb;
+    --muted: #77756e;
+    --faint: #4a4944;
+    --accent: #d9a441;
+    --accent-dim: rgba(217, 164, 65, 0.14);
+    --ok: #6fbf73;
+    --danger: #cf4a3d;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    min-height: 100vh;
+    overflow: hidden;
+    position: relative;
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono {
+    font-family: "Consolas", "Courier New", monospace;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+  }
+
+  /* ================= Background atmosphere ================= */
+  .bg { position: fixed; inset: 0; z-index: 0; background: var(--bg); }
+  /* глубокое янтарное свечение слева, как дуга света */
+  .bg::before {
+    content: "";
+    position: absolute;
+    left: -42vw; top: 50%;
+    width: 80vw; height: 160vh;
+    transform: translateY(-50%);
+    background: radial-gradient(closest-side, rgba(217,164,65,0.16), rgba(217,164,65,0.05) 45%, transparent 70%);
+    filter: blur(10px);
+    animation: breathe 9s ease-in-out infinite;
+  }
+  .bg::after {
+    content: "";
+    position: absolute;
+    right: -30vw; bottom: -50vh;
+    width: 65vw; height: 110vh;
+    background: radial-gradient(closest-side, rgba(90,105,135,0.10), transparent 70%);
+  }
+  @keyframes breathe {
+    0%, 100% { opacity: .85; }
+    50% { opacity: 1.0; }
+  }
+  /* дуга-обод, отсылка к "затмению" */
+  .arc {
+    position: fixed;
+    left: -58vh; top: 50%;
+    transform: translateY(-50%);
+    width: 116vh; height: 116vh;
+    border-radius: 50%;
+    border: 1px solid rgba(217,164,65,0.28);
+    box-shadow:
+      0 0 60px rgba(217,164,65,0.12),
+      inset 0 0 90px rgba(217,164,65,0.06);
+    z-index: 0;
+    pointer-events: none;
+  }
+  .arc::before {
+    content: "";
+    position: absolute;
+    inset: 26px;
+    border-radius: 50%;
+    border: 1px dashed rgba(255,255,255,0.06);
+    animation: spin 90s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* тонкая сетка */
+  .gridlines {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
+    background-size: 90px 90px;
+    mask-image: radial-gradient(ellipse at 50% 45%, black 30%, transparent 78%);
+    -webkit-mask-image: radial-gradient(ellipse at 50% 45%, black 30%, transparent 78%);
+  }
+
+  /* сканлайны + виньетка */
+  body::after {
+    content: "";
+    position: fixed; inset: 0; z-index: 60; pointer-events: none;
+    background:
+      repeating-linear-gradient(0deg,
+        rgba(255,255,255,0.016) 0px, rgba(255,255,255,0.016) 1px,
+        transparent 1px, transparent 4px),
+      radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.55) 100%);
+  }
+
+  /* ================= Layout ================= */
+  .layout {
+    position: relative;
+    z-index: 1;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    padding: 26px 36px 28px;
+  }
+
+  /* ================= Top bar ================= */
+  .topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 20px;
+  }
+  .top-left { display: flex; flex-direction: column; gap: 6px; }
+  .brandline { display: flex; align-items: center; gap: 12px; }
+  .brand-mark {
+    width: 30px; height: 30px;
+    border: 2px solid var(--text);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 8px; font-weight: 800; letter-spacing: .08em;
+    flex-shrink: 0;
+  }
+  .brandline .sys { font-size: 11px; color: var(--muted); }
+  .brandline .sys b { color: var(--text); font-weight: 600; }
+  .clockline { font-size: 12px; color: var(--faint); display: flex; gap: 10px; align-items: baseline; }
+  .clockline time {
+    color: var(--accent);
+    font-size: 15px;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: .18em;
+  }
+
+  .top-right { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+  .telemetry { font-size: 10px; color: var(--faint); display: flex; gap: 8px; align-items: center; }
+  .telemetry .k { color: var(--faint); }
+  .telemetry .v { color: var(--text); }
+  .telemetry .v.ok { color: var(--ok); }
+  .telemetry .v.warn { color: var(--accent); }
+  .online-big {
+    display: flex; align-items: baseline; gap: 8px;
+    margin-top: 2px;
+  }
+  .online-big .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--ok);
+    box-shadow: 0 0 10px var(--ok);
+    animation: blink 1.8s infinite;
+    align-self: center;
+  }
+  .online-big .num {
+    font-size: 22px; font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: .05em;
+  }
+  .online-big .num span { color: var(--muted); font-weight: 400; }
+  @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: .25; } }
+
+  .sound-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 10px;
+    padding: 6px 14px;
+    cursor: pointer;
+    transition: border-color .2s, color .2s;
+    margin-top: 4px;
+  }
+  .sound-btn:hover { border-color: var(--accent); color: var(--text); }
+  .sound-btn .sv { color: var(--accent); margin-left: 6px; }
+  .sound-btn.off .sv { color: var(--faint); }
+
+  /* ================= Hero ================= */
+  .hero {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(280px, .9fr);
+    gap: 40px;
+    align-items: center;
+    max-width: 1280px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 12px 0;
+  }
+
+  .hero-left { display: flex; flex-direction: column; gap: 22px; min-width: 0; }
+  .kicker {
+    font-size: 11px;
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .kicker::before {
+    content: "";
+    width: 34px; height: 1px;
+    background: var(--accent);
+    opacity: .6;
+  }
+  .hero-title {
+    font-size: clamp(38px, 6.2vw, 84px);
+    font-weight: 800;
+    line-height: .98;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+    text-transform: uppercase;
+  }
+  .hero-title .accent { color: var(--accent); }
+  .hero-sub {
+    max-width: 52ch;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.75;
+  }
+  .hero-meta {
+    display: flex;
+    gap: 28px;
+    flex-wrap: wrap;
+    padding-top: 4px;
+  }
+  .meta-item { display: flex; flex-direction: column; gap: 4px; }
+  .meta-item .mk { font-size: 9px; color: var(--faint); }
+  .meta-item .mv { font-size: 13px; color: var(--text); letter-spacing: .06em; }
+  .meta-item .mv.hl { color: var(--accent); }
+
+  /* ================= Player panel ================= */
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border-soft);
+    backdrop-filter: blur(14px);
+    padding: 26px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    position: relative;
+    overflow: hidden;
+  }
+  .panel::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(217,164,65,0.55), transparent);
+  }
+  .panel-tag {
+    font-size: 9px;
+    color: var(--accent);
+    background: var(--accent-dim);
+    border: 1px solid rgba(217,164,65,0.25);
+    align-self: flex-start;
+    padding: 4px 10px;
+  }
+  .panel-row { display: flex; align-items: center; gap: 16px; }
+  .avatar {
+    width: 62px; height: 62px;
+    border-radius: 50%;
+    border: 2px solid var(--accent);
+    background: rgba(255,255,255,0.03);
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+    flex-shrink: 0;
+    box-shadow: 0 0 26px rgba(217,164,65,.18);
+  }
+  .avatar svg { width: 30px; height: 30px; }
+  .avatar .st {
+    position: absolute;
+    right: 0; bottom: 0;
+    width: 13px; height: 13px;
+    border-radius: 50%;
+    background: var(--ok);
+    border: 3px solid #0a0a0a;
+  }
+  .pinfo { min-width: 0; }
+  .pname { font-size: 17px; font-weight: 700; letter-spacing: .02em; }
+  .psid { font-size: 11px; color: var(--faint); font-variant-numeric: tabular-nums; margin-top: 2px; }
+  .pjoin {
+    font-size: 10px;
+    color: var(--accent);
+    margin-top: 6px;
+    animation: blink 2.4s infinite;
+  }
+
+  .panel-divider { height: 1px; background: var(--border-soft); }
+  .panel-kv { display: flex; flex-direction: column; gap: 10px; }
+  .kv { display: flex; justify-content: space-between; gap: 12px; font-size: 11px; }
+  .kv .k { color: var(--faint); }
+  .kv .v { color: var(--text); letter-spacing: .05em; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .kv .v.hl { color: var(--accent); }
+
+  /* лог терминала внутри панели */
+  .term {
+    background: rgba(0,0,0,0.35);
+    border: 1px solid var(--border-soft);
+    padding: 12px 14px;
+    font-size: 10px;
+    line-height: 1.9;
+    color: var(--muted);
+    letter-spacing: .06em;
+    min-height: 76px;
+    text-transform: none;
+  }
+  .term .ln::before { content: ">_ "; color: var(--accent); }
+  .term .cursor {
+    display: inline-block;
+    width: 7px; height: 11px;
+    background: var(--accent);
+    vertical-align: -1px;
+    animation: blink 1s steps(1) infinite;
+  }
+
+  /* ================= Bottom: download ================= */
+  .bottom {
+    max-width: 1280px;
+    width: 100%;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .dl-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 20px;
+  }
+  .dl-left { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .dl-label { font-size: 9px; color: var(--faint); }
+  .dl-file {
+    font-size: 13px;
+    color: var(--text);
+    letter-spacing: .04em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-transform: none;
+  }
+  .dl-file b { color: var(--accent); font-weight: 400; }
+  .dl-right { display: flex; align-items: baseline; gap: 18px; flex-shrink: 0; }
+  .dl-count { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .dl-pct {
+    font-size: clamp(26px, 3.2vw, 40px);
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+    line-height: 1;
+  }
+  .dl-pct em { font-style: normal; color: var(--muted); font-size: .5em; font-weight: 400; }
+
+  .track {
+    height: 3px;
+    background: rgba(255,255,255,0.07);
+    position: relative;
+    overflow: visible;
+  }
+  .fill {
+    height: 100%;
+    width: 0%;
+    background: var(--accent);
+    box-shadow: 0 0 14px rgba(217,164,65,.55);
+    transition: width .4s ease;
+    position: relative;
+  }
+  .fill::after {
+    content: "";
+    position: absolute;
+    right: -1px; top: 50%;
+    width: 9px; height: 9px;
+    transform: translateY(-50%);
+    background: var(--accent);
+    box-shadow: 0 0 16px rgba(217,164,65,.9);
+    border-radius: 50%;
+  }
+  /* деления на шкале */
+  .track .ticks {
+    position: absolute;
+    inset: 0;
+    background-image: linear-gradient(90deg, rgba(0,0,0,0.9) 1px, transparent 1px);
+    background-size: 10% 100%;
+    pointer-events: none;
+  }
+
+  .dl-foot {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    font-size: 10px;
+    color: var(--faint);
+  }
+  .dl-foot #status-line { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* полоса-предупреждение */
+  .hazard {
+    height: 5px;
+    margin-top: 10px;
+    background: repeating-linear-gradient(
+      -45deg,
+      rgba(217,164,65,.5) 0 12px,
+      transparent 12px 24px
+    );
+    opacity: .35;
+  }
+
+  @media (max-width: 900px) {
+    body { overflow: auto; }
+    .layout { height: auto; min-height: 100vh; gap: 28px; }
+    .hero { grid-template-columns: 1fr; gap: 26px; }
+    .arc { display: none; }
+    .top-right { align-items: flex-start; }
+    .topbar { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+  <div class="bg" aria-hidden="true"></div>
+  <div class="arc" aria-hidden="true"></div>
+  <div class="gridlines" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <!-- ===== Верхняя панель ===== -->
+    <header class="topbar">
+      <div class="top-left">
+        <div class="brandline">
+          <span class="brand-mark mono" aria-hidden="true">SCP</span>
+          <span class="sys mono"><b>SCP-FND</b> // SITE-19 // UPLINK</span>
+        </div>
+        <div class="clockline mono">
+          <span>MSK</span>
+          <time id="msk-time" datetime="">--:--:--</time>
+        </div>
+      </div>
+
+      <div class="top-right">
+        <div class="telemetry mono"><span class="k">CONTAINMENT.STATE</span><span class="v ok">STABLE</span></div>
+        <div class="telemetry mono"><span class="k">CLEARANCE.REQ</span><span class="v warn">LEVEL-2</span></div>
+        <div class="online-big mono">
+          <span class="dot" aria-hidden="true"></span>
+          <span class="num"><span id="online-now">--</span><span> / <span id="online-max">--</span></span></span>
+        </div>
+        <button class="sound-btn mono" id="sound-btn" type="button" aria-label="Включить или выключить музыку">
+          SOUND<span class="sv" id="sound-state">ON</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- ===== Центр ===== -->
+    <main class="hero">
+      <div class="hero-left">
+        <div class="kicker mono">Secure &#183; Contain &#183; Protect</div>
+        <h1 class="hero-title" id="srv-title">SCP<br><span class="accent">Foundation</span> RP</h1>
+        <p class="hero-sub">Добро пожаловать в Зону-19. Вы&nbsp;&#8212; часть Фонда: исследуйте аномалии,
+          удерживайте объекты и не допускайте нарушения условий содержания.
+          Идёт загрузка контента сервера &#8212; ожидайте выдачи допуска.
+          Нарушение протоколов ведёт к назначению в класс&nbsp;D.</p>
+        <div class="hero-meta">
+          <div class="meta-item">
+            <span class="mk mono">Карта</span>
+            <span class="mv mono" id="map-name">rp_site19</span>
+          </div>
+          <div class="meta-item">
+            <span class="mk mono">Режим</span>
+            <span class="mv mono">SCP-RP</span>
+          </div>
+          <div class="meta-item">
+            <span class="mk mono">Статус допуска</span>
+            <span class="mv mono hl" id="access-state">Оформляется...</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Панель игрока -->
+      <aside class="panel" aria-label="Подключение игрока">
+        <span class="panel-tag mono">Идентификация сотрудника</span>
+        <div class="panel-row">
+          <div class="avatar">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="12" cy="8" r="4" fill="#d9a441"/>
+              <path d="M4 20c0-3.3 3.6-5 8-5s8 1.7 8 5" stroke="#d9a441" stroke-width="2.4" stroke-linecap="round"/>
+            </svg>
+            <span class="st" aria-hidden="true"></span>
+          </div>
+          <div class="pinfo">
+            <div class="pname" id="pl-name">Test User</div>
+            <div class="psid mono" id="pl-sid">76561198849797255</div>
+            <div class="pjoin mono">Подключение...</div>
+          </div>
+        </div>
+        <div class="panel-divider" aria-hidden="true"></div>
+        <div class="panel-kv">
+          <div class="kv mono"><span class="k">Сервер</span><span class="v" id="srv-title2">SCP Foundation RP</span></div>
+          <div class="kv mono"><span class="k">Протокол</span><span class="v hl">O5-CLEARED</span></div>
+        </div>
+        <div class="term mono" id="term" aria-live="polite">
+          <div class="ln">установка защищённого канала...</div>
+          <span class="cursor" aria-hidden="true"></span>
+        </div>
+      </aside>
+    </main>
+
+    <!-- ===== Низ: загрузка файлов ===== -->
+    <footer class="bottom" aria-label="Загрузка файлов">
+      <div class="dl-head">
+        <div class="dl-left">
+          <span class="dl-label mono">Передача данных // SITE-19 UPLINK</span>
+          <span class="dl-file mono" id="cur-file">Инициализация канала передачи...</span>
+        </div>
+        <div class="dl-right">
+          <span class="dl-count mono"><span id="files-done">0</span> / <span id="files-total">0</span> файлов</span>
+          <span class="dl-pct"><span id="bar-pct">0</span><em>%</em></span>
+        </div>
+      </div>
+      <div class="track">
+        <div class="fill" id="bar-fill"></div>
+        <div class="ticks" aria-hidden="true"></div>
+      </div>
+      <div class="dl-foot mono">
+        <span id="status-line">Установка защищённого соединения с Зоной-19...</span>
+        <span>DOC #SCP-███-19 // О5 APPROVED</span>
+      </div>
+      <div class="hazard" aria-hidden="true"></div>
+    </footer>
+  </div>
+
+<audio id="bg-music" src="scp-theme.ogg" loop preload="auto"></audio>
+
+<script>
+  // ================== Настройка сервера ==================
+  // Укажите здесь ВАШ сервер, чтобы показывать реальный онлайн и название:
+  // 1) SERVER_IP — IP:порт вашего GMod-сервера (например "193.164.16.55:27015"),
+  //    онлайн будет найден автоматически через api.battlemetrics.com
+  // 2) Либо BATTLEMETRICS_ID — точный ID сервера со страницы battlemetrics.com
+  //    (число из ссылки вида battlemetrics.com/servers/gmod/1234567)
+  var CONFIG = {
+    SERVER_IP: '',          // <-- впишите "ip:порт" вашего сервера
+    BATTLEMETRICS_ID: '',   // <-- или ID с battlemetrics.com (приоритетнее)
+    MUSIC_VOLUME: 0.35
+  };
+
+  // ================== Часы по МСК ==================
+  var timeEl = document.getElementById('msk-time');
+  var mskFmt = new Intl.DateTimeFormat('ru-RU', {
+    timeZone: 'Europe/Moscow',
+    hour: '2-digit', minute: '2-digit', second: '2-digit'
+  });
+  function tick() {
+    var now = new Date();
+    timeEl.textContent = mskFmt.format(now);
+    timeEl.setAttribute('datetime', now.toISOString());
+  }
+  tick();
+  setInterval(tick, 1000);
+
+  // ================== Элементы ==================
+  var elOnlineNow = document.getElementById('online-now');
+  var elOnlineMax = document.getElementById('online-max');
+  var elPlName = document.getElementById('pl-name');
+  var elPlSid = document.getElementById('pl-sid');
+  var elMap = document.getElementById('map-name');
+  var elCurFile = document.getElementById('cur-file');
+  var elFilesDone = document.getElementById('files-done');
+  var elFilesTotal = document.getElementById('files-total');
+  var elFill = document.getElementById('bar-fill');
+  var elPct = document.getElementById('bar-pct');
+  var elStatus = document.getElementById('status-line');
+  var elAccess = document.getElementById('access-state');
+  var elTerm = document.getElementById('term');
+
+  var totalFiles = 0;
+  var neededFiles = 0;
+  var isGmod = false;
+
+  function setProgress(pct) {
+    pct = Math.max(0, Math.min(100, Math.round(pct)));
+    elFill.style.width = pct + '%';
+    elPct.textContent = pct;
+    if (pct >= 100) elAccess.textContent = 'Выдан';
+  }
+
+  function shortFileName(f) {
+    // GMod присылает полные пути — оставляем только имя файла
+    var parts = String(f).split(/[\\\/]/);
+    return parts[parts.length - 1] || f;
+  }
+
+  // Мини-лог терминала (последние 3 строки)
+  var termLines = [];
+  function termLog(msg) {
+    termLines.push(msg);
+    if (termLines.length > 3) termLines.shift();
+    var html = '';
+    for (var i = 0; i < termLines.length; i++) {
+      html += '<div class="ln">' + termLines[i] + '</div>';
+    }
+    elTerm.innerHTML = html + '<span class="cursor" aria-hidden="true"></span>';
+  }
+
+  // ================== API загрузочного экрана Garry's Mod ==================
+  // Эти функции вызывает сам GMod-клиент во время подключения к серверу.
+  // Чтобы экран заработал, в server.cfg укажите:
+  //   sv_loadingurl "https://ваш-ник.github.io/"
+
+  window.GameDetails = function (servername, serverurl, mapname, maxplayers, steamid, gamemode) {
+    isGmod = true;
+    if (mapname) elMap.textContent = mapname;
+    if (maxplayers) elOnlineMax.textContent = maxplayers;
+    if (steamid) elPlSid.textContent = steamid;
+    if (servername) setServerName(servername);
+    elStatus.textContent = 'Подключение к серверу: ' + (servername || 'SCP Foundation RP');
+    termLog('сервер: ' + (servername || 'н/д'));
+  };
+
+  window.SetFilesTotal = function (total) {
+    isGmod = true;
+    totalFiles = Number(total) || 0;
+    elFilesTotal.textContent = totalFiles;
+  };
+
+  window.SetFilesNeeded = function (needed) {
+    isGmod = true;
+    neededFiles = Number(needed) || 0;
+    if (totalFiles > 0) {
+      var done = totalFiles - neededFiles;
+      elFilesDone.textContent = done;
+      setProgress((done / totalFiles) * 100);
+    }
+  };
+
+  window.DownloadingFile = function (fileName) {
+    isGmod = true;
+    var short = shortFileName(fileName);
+    elCurFile.innerHTML = 'Загрузка: <b></b>';
+    elCurFile.querySelector('b').textContent = short;
+    termLog('получен: ' + short);
+  };
+
+  window.SetStatusChanged = function (status) {
+    isGmod = true;
+    elStatus.textContent = status;
+    if (/(retrieving|получение|sending|отправка)/i.test(status)) {
+      elCurFile.textContent = status;
+    }
+    if (/lua/i.test(status)) {
+      setProgress(100);
+      elCurFile.textContent = 'Файлы получены. Инициализация Lua...';
+      termLog('инициализация lua...');
+    }
+  };
+
+  // ================== Демо-режим (просмотр в браузере, вне GMod) ==================
+  // Если через 2 секунды GMod не вызвал API — показываем имитацию загрузки,
+  // чтобы экран можно было посмотреть и настроить прямо в браузере.
+  setTimeout(function () {
+    if (isGmod) return;
+
+    var demoFiles = [
+      'maps/rp_site19.bsp',
+      'models/scp/scp173.mdl',
+      'models/scp/scp096.mdl',
+      'materials/scp/containment_door.vmt',
+      'sound/scp/alarm_breach.mp3',
+      'sound/scp/announcement_o5.mp3',
+      'materials/scp/keycard_lvl3.vtf',
+      'models/weapons/w_micro_hid.mdl',
+      'lua/autorun/scp_gamemode_init.lua',
+      'materials/scp/blood_decal.vmt',
+      'sound/scp/heartbeat_096.mp3',
+      'models/props/site19_desk.mdl'
+    ];
+
+    window.SetFilesTotal(demoFiles.length);
+    isGmod = false;
+    var i = 0;
+
+    function next() {
+      if (i >= demoFiles.length) {
+        window.SetStatusChanged('Получение Lua-файлов с сервера...');
+        isGmod = false;
+        setTimeout(function () {
+          elStatus.textContent = 'Вход в Зону-19 разрешён. Добро пожаловать, сотрудник.';
+          termLog('доступ разрешён.');
+        }, 1600);
+        return;
+      }
+      window.DownloadingFile(demoFiles[i]);
+      isGmod = false;
+      i++;
+      window.SetFilesNeeded(demoFiles.length - i);
+      isGmod = false;
+      setTimeout(next, 500 + Math.random() * 900);
+    }
+    elStatus.textContent = 'Демо-режим: имитация подключения (в GMod будет реальный прогресс)';
+    termLog('демо-режим активен');
+    next();
+  }, 2000);
+
+  // ================== Название сервера ==================
+  var elTitle = document.getElementById('srv-title');
+  var elTitle2 = document.getElementById('srv-title2');
+  function setServerName(name) {
+    name = String(name).trim();
+    if (!name) return;
+    elTitle.textContent = name;
+    elTitle2.textContent = name;
+    document.title = name + ' — Loading Screen';
+  }
+
+  // ================== Реальный онлайн (BattleMetrics API) ==================
+  // Публичное API battlemetrics.com отдаёт живой онлайн GMod-серверов
+  // прямо из браузера (работает и на github.io, и в России).
+  var bmId = CONFIG.BATTLEMETRICS_ID;
+
+  function applyServerData(attrs) {
+    if (!attrs) return;
+    if (typeof attrs.players === 'number') elOnlineNow.textContent = attrs.players;
+    if (typeof attrs.maxPlayers === 'number') elOnlineMax.textContent = attrs.maxPlayers;
+    // В GMod реальное имя приходит из GameDetails — не перезаписываем его
+    if (!isGmod && attrs.name) setServerName(attrs.name);
+  }
+
+  function fetchOnline() {
+    if (bmId) {
+      fetch('https://api.battlemetrics.com/servers/' + encodeURIComponent(bmId))
+        .then(function (r) { return r.json(); })
+        .then(function (j) { if (j && j.data) applyServerData(j.data.attributes); })
+        .catch(function () {});
+    } else if (CONFIG.SERVER_IP) {
+      // Ищем сервер по IP:порту и запоминаем его ID
+      var url = 'https://api.battlemetrics.com/servers?filter[game]=gmod&filter[search]=' +
+        encodeURIComponent(CONFIG.SERVER_IP) + '&page[size]=1';
+      fetch(url)
+        .then(function (r) { return r.json(); })
+        .then(function (j) {
+          if (j && j.data && j.data.length) {
+            bmId = j.data[0].id;
+            applyServerData(j.data[0].attributes);
+          }
+        })
+        .catch(function () {});
+    }
+  }
+
+  if (CONFIG.BATTLEMETRICS_ID || CONFIG.SERVER_IP) {
+    // Реальный онлайн: сразу и далее каждые 30 секунд
+    fetchOnline();
+    setInterval(fetchOnline, 30000);
+  } else {
+    // Сервер не указан в CONFIG — показываем имитацию, чтобы экран не был пустым
+    elOnlineMax.textContent = '67';
+    var current = 5 + Math.floor(Math.random() * 8);
+    function updateOnline() {
+      current += Math.floor(Math.random() * 5) - 2;
+      var max = parseInt(elOnlineMax.textContent, 10) || 67;
+      if (current < 1) current = 1;
+      if (current > max) current = max;
+      elOnlineNow.textContent = current;
+    }
+    updateOnline();
+    setInterval(updateOnline, 4000);
+  }
+
+  // ================== Фоновая музыка ==================
+  var music = document.getElementById('bg-music');
+  var soundBtn = document.getElementById('sound-btn');
+  var soundState = document.getElementById('sound-state');
+  var soundOn = true;
+  music.volume = CONFIG.MUSIC_VOLUME;
+
+  function tryPlay() {
+    if (!soundOn) return;
+    var p = music.play();
+    if (p && p.catch) p.catch(function () { /* автозапуск заблокирован — ждём клика */ });
+  }
+
+  function setSound(on) {
+    soundOn = on;
+    soundState.textContent = on ? 'ON' : 'OFF';
+    soundBtn.classList.toggle('off', !on);
+    if (on) tryPlay(); else music.pause();
+  }
+
+  soundBtn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    setSound(!soundOn);
+  });
+
+  // В GMod автозапуск музыки работает сразу; в обычном браузере —
+  // после первого взаимодействия со страницей (политика автовоспроизведения).
+  tryPlay();
+  document.addEventListener('click', tryPlay, { once: true });
+  document.addEventListener('keydown', tryPlay, { once: true });
+</script>
+</body>
+</html>
