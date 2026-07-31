@@ -450,9 +450,6 @@
           <span class="dot" aria-hidden="true"></span>
           <span class="num"><span id="online-now">--</span><span> / <span id="online-max">--</span></span></span>
         </div>
-        <button class="sound-btn mono" id="sound-btn" type="button" aria-label="Включить или выключить музыку">
-          SOUND<span class="sv" id="sound-state">ON</span>
-        </button>
       </div>
     </header>
 
@@ -533,8 +530,6 @@
       <div class="hazard" aria-hidden="true"></div>
     </footer>
   </div>
-
-<audio id="bg-music" src="scp-theme.ogg" loop preload="auto"></audio>
 
 <script>
   // ================== Настройка сервера ==================
@@ -771,36 +766,7 @@
     setInterval(updateOnline, 4000);
   }
 
-  // ================== Фоновая музыка ==================
-  var music = document.getElementById('bg-music');
-  var soundBtn = document.getElementById('sound-btn');
-  var soundState = document.getElementById('sound-state');
-  var soundOn = true;
-  music.volume = CONFIG.MUSIC_VOLUME;
 
-  function tryPlay() {
-    if (!soundOn) return;
-    var p = music.play();
-    if (p && p.catch) p.catch(function () { /* автозапуск заблокирован — ждём клика */ });
-  }
-
-  function setSound(on) {
-    soundOn = on;
-    soundState.textContent = on ? 'ON' : 'OFF';
-    soundBtn.classList.toggle('off', !on);
-    if (on) tryPlay(); else music.pause();
-  }
-
-  soundBtn.addEventListener('click', function (e) {
-    e.stopPropagation();
-    setSound(!soundOn);
-  });
-
-  // В GMod автозапуск музыки работает сразу; в обычном браузере —
-  // после первого взаимодействия со страницей (политика автовоспроизведения).
-  tryPlay();
-  document.addEventListener('click', tryPlay, { once: true });
-  document.addEventListener('keydown', tryPlay, { once: true });
 </script>
 </body>
 </html>
